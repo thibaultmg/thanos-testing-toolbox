@@ -1,0 +1,36 @@
+- meta:
+    # blockmeta:
+    #   ulid: "0000000000000000000000000L"
+    #   mintime: 0
+    #   maxtime: 0000000000
+    #   stats:
+    #     numsamples: 100
+    #     numseries: 1
+    #     numchunks: 10
+    #     numtombstones: 0
+    #   compaction:
+    #     level: 0
+    #     sources: []
+    #     deletable: false
+    #     parents: []
+    #     failed: false
+    #   version: 0
+    thanos:
+      labels: 
+        cluster: "eu1"
+      downsample:
+        resolution: 0
+      source: ""
+  series: 
+  - type: "GAUGE"
+    mintime: 0
+    maxtime: 100000000000
+    jitter: 20
+    scrapeInterval: 15000000000
+    changeInterval: 3600000000000
+    max: 20
+    min: 1
+    labels:
+      __name__: "kube_pod_container_resource_limits_memory_bytes"
+      cluster: "eu1"
+      container: "addon-resizer"
