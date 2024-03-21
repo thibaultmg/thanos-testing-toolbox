@@ -1,6 +1,10 @@
 package thanos
 
 import (
+	"fmt"
+	"net"
+	"net/netip"
+
 	"github.com/observatorium/observatorium/configuration_go/abstr/kubernetes/thanos/store"
 	kghelpers "github.com/observatorium/observatorium/configuration_go/kubegen/helpers"
 	"github.com/observatorium/observatorium/configuration_go/schemas/log"
@@ -10,12 +14,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) []runtime.Object {
+type StoreOutput struct {
+	Objects  []runtime.Object
+	GrpcPort int
+	HttpPort int
+	SvcName  string
+}
+
+func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) StoreOutput {
+	grpcPort := 10901
+	httpPort := 10902
+	name := "thanos-store"
 	opts := &store.StoreOptions{
 		LogLevel:       log.LevelDebug,
 		LogFormat:      log.FormatLogfmt,
 		DataDir:        "/var/thanos/store",
 		ObjstoreConfig: objstoreCfg,
+		GrpcAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("127.0.0.1:%d", grpcPort))),
+		HttpAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("127.0.0.1:%d", httpPort))),
 	}
 
 	if cfg.ImageTag == "" {
@@ -26,6 +42,7 @@ func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) []runtime.O
 	storeDepl.VolumeSize = "1Gi"
 	storeDepl.Replicas = 1
 	storeDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "200Mi", "400Mi")
+	storeDepl.Name = name
 
 	if cfg.Image != "" {
 		storeDepl.Image = cfg.Image
@@ -34,14 +51,12 @@ func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) []runtime.O
 	// remove env var
 	storeDepl.Env = storeDepl.Env[1:]
 
-	ret := storeDepl.Objects()
+	objects := storeDepl.Objects()
 
 	if cfg.Platform == config.PlatformKind {
 		// persistent volume claim is changed to emptyDir volume
-		// fmt.Println("changing persistent volume claim to emptyDir volume")
-		sts := kghelpers.GetObject[*appsv1.StatefulSet](ret, "")
+		sts := kghelpers.GetObject[*appsv1.StatefulSet](objects, "")
 		oldVolume := sts.Spec.VolumeClaimTemplates[0]
-		// fmt.Println(oldVolume)
 		sts.Spec.VolumeClaimTemplates = nil
 		sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, corev1.Volume{
 			Name: oldVolume.Name,
@@ -49,10 +64,14 @@ func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) []runtime.O
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		})
-		// storeDepl.
 	}
 
 	// TODO: add route
 
-	return ret
+	return StoreOutput{
+		Objects:  objects,
+		GrpcPort: grpcPort,
+		HttpPort: httpPort,
+		SvcName:  name,
+	}
 }
