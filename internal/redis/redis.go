@@ -1,23 +1,25 @@
 package redis
 
 import (
-	"log/slog"
-	"os"
+	_ "embed"
 
 	kghelpers "github.com/observatorium/observatorium/configuration_go/kubegen/helpers"
-	"github.com/observatorium/observatorium/configuration_go/kubegen/kubeyaml"
 	"github.com/observatorium/observatorium/configuration_go/kubegen/workload"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func Manifests(dir string) {
-	slog.Info("generating thanos-store manifests")
-	// generate manifests
-	os.RemoveAll(dir)
-	kubeyaml.WriteObjectsInDir(makeRedis(), dir)
-}
+//go:embed resources/redis.conf
+var redisConfig string
 
-func makeRedis() []runtime.Object {
+const (
+	Port        = 6379
+	ServiceName = "redis"
+	Username    = "thanosuser"
+	Password    = "thanospassword"
+)
+
+func Objects() []runtime.Object {
 	deployment := workload.DeploymentWorkload{
 		Replicas: 1,
 		PodConfig: workload.PodConfig{
@@ -28,9 +30,22 @@ func makeRedis() []runtime.Object {
 			ContainerResources: kghelpers.NewResourcesRequirements("100m", "", "200Mi", "400Mi"),
 			LivenessProbe:      kghelpers.NewProbe("", 6379, kghelpers.ProbeConfig{InitialDelaySeconds: 15, PeriodSeconds: 20}),
 			ReadinessProbe:     kghelpers.NewProbe("", 6379, kghelpers.ProbeConfig{InitialDelaySeconds: 5, PeriodSeconds: 10}),
+			ConfigMaps: map[string]map[string]string{
+				"redis-config": {
+					"redis.conf": redisConfig,
+				},
+			},
 		},
 	}
 
 	container := deployment.ToContainer()
+	container.Command = []string{"redis-server", "/etc/redis/redis.conf"}
+	container.VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      "redis-config",
+			MountPath: "/etc/redis",
+		},
+	}
+	container.Volumes = []corev1.Volume{kghelpers.NewPodVolumeFromConfigMap("redis-config", "redis-config")}
 	return deployment.Objects(container)
 }

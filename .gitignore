@@ -23,3 +23,4 @@ go.work
 
 manifests/
 .DS_Store
+tmp/

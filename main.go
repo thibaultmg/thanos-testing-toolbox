@@ -27,15 +27,18 @@ func main() {
 	WriteObjectsInDir(storeOutput.Objects, "manifests/thanos-store")
 
 	// Set up Thanos Query
-	objs = thanos.NewThanosQuery(depCfg, &thanos.QueryConfig{
+	queryOutput := thanos.NewThanosQuery(depCfg, &thanos.QueryConfig{
 		StoreServiceName: storeOutput.SvcName,
 		StoreGRPCPort:    storeOutput.GrpcPort,
 	})
-	WriteObjectsInDir(objs, "manifests/thanos-query")
+	WriteObjectsInDir(queryOutput.Objects, "manifests/thanos-query")
 
-	// thanos.QueryManifests("manifests/thanos-query")
-	// thanos.QueryFrontendManifests("manifests/thanos-query-frontend")
-	// WriteObjectsInDir(redis.Objects(), "manifests/redis")
+	// Set up Thanos Query-frontend
+	objs = thanos.NewThanosQueryFrontend(depCfg, &thanos.QueryFrontendConfig{
+		QueryServiceName: queryOutput.ServiceName,
+		QueryPort:        queryOutput.HttpPort,
+	})
+	WriteObjectsInDir(objs, "manifests/thanos-query-frontend")
 }
 
 func WriteObjectsInDir(kubeObjects []runtime.Object, dir string) {
