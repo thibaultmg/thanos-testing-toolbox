@@ -30,8 +30,8 @@ func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) StoreOutput
 		LogFormat:      log.FormatLogfmt,
 		DataDir:        "/var/thanos/store",
 		ObjstoreConfig: objstoreCfg,
-		GrpcAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("127.0.0.1:%d", grpcPort))),
-		HttpAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("127.0.0.1:%d", httpPort))),
+		GrpcAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("0.0.0.0:%d", grpcPort))),
+		HttpAddress:    net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("0.0.0.0:%d", httpPort))),
 	}
 
 	if cfg.ImageTag == "" {
@@ -41,7 +41,7 @@ func NewThanosStore(cfg config.DeploymentConfig, objstoreCfg string) StoreOutput
 	storeDepl := store.NewStore(opts, cfg.Namespace, cfg.ImageTag)
 	storeDepl.VolumeSize = "1Gi"
 	storeDepl.Replicas = 1
-	storeDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "200Mi", "400Mi")
+	storeDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "100Mi", "200Mi")
 	storeDepl.Name = name
 
 	if cfg.Image != "" {

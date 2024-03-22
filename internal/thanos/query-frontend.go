@@ -29,14 +29,21 @@ func NewThanosQueryFrontend(cfg config.DeploymentConfig, qfCfg *QueryFrontendCon
 
 	if qfCfg.WithRedisResponseCache {
 		opts.QueryRangeResponseCacheConfig = cache.NewResponseCacheConfig(rediscfg.RedisClientConfig{
-			Addr: fmt.Sprintf("%s:%d", redis.ServiceName, redis.Port),
+			Addr:     fmt.Sprintf("%s.%s.svc.cluster.local:%d", redis.ServiceName, cfg.Namespace, redis.Port),
+			Password: redis.Password,
+			Username: redis.Username,
 		})
-		ret = append(ret, redis.Objects()...)
+		ret = append(ret, redis.Objects(config.DeploymentConfig{
+			Namespace: cfg.Namespace,
+			ImageTag:  "latest",
+			Image:     "docker.io/redis",
+		})...)
 	}
 
 	queryFrontendDepl := queryfrontend.NewQueryFrontend(opts, cfg.Namespace, cfg.ImageTag)
 	queryFrontendDepl.Replicas = 1
-	queryFrontendDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "200Mi", "400Mi")
+	queryFrontendDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "100Mi", "200Mi")
+	queryFrontendDepl.Name = "thanos-query-frontend"
 
 	if cfg.ImageTag == "" {
 		queryFrontendDepl.ImageTag = "latest"

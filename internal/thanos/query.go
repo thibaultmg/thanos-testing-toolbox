@@ -12,9 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type StoreEndpoint struct {
+	GrpcPort    int
+	ServiceName string
+}
+
 type QueryConfig struct {
-	StoreServiceName string
-	StoreGRPCPort    int
+	StoreEndpoints []StoreEndpoint
 }
 
 type QueryOutput struct {
@@ -27,12 +31,13 @@ func NewThanosQuery(cfg config.DeploymentConfig, queryCfg *QueryConfig) *QueryOu
 	serviceName := "thanos-query"
 	httpPort := 10902
 	opts := &query.QueryOptions{
-		LogLevel:  log.LevelDebug,
-		LogFormat: log.FormatLogfmt,
-		Endpoint: []string{
-			fmt.Sprintf("dnssrv+_grpc._tcp.%s.%s.svc.cluster.local", queryCfg.StoreServiceName, cfg.Namespace),
-		},
-		HttpAddress: net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("127.0.0.1:%d", httpPort))),
+		LogLevel:    log.LevelDebug,
+		LogFormat:   log.FormatLogfmt,
+		HttpAddress: net.TCPAddrFromAddrPort(netip.MustParseAddrPort(fmt.Sprintf("0.0.0.0:%d", httpPort))),
+	}
+
+	for _, storeEndpoint := range queryCfg.StoreEndpoints {
+		opts.Endpoint = append(opts.Endpoint, fmt.Sprintf("dnssrv+_grpc._tcp.%s.%s.svc.cluster.local", storeEndpoint.ServiceName, cfg.Namespace))
 	}
 
 	if cfg.ImageTag == "" {
@@ -41,7 +46,7 @@ func NewThanosQuery(cfg config.DeploymentConfig, queryCfg *QueryConfig) *QueryOu
 
 	queryDepl := query.NewQuery(opts, cfg.Namespace, cfg.ImageTag)
 	queryDepl.Replicas = 1
-	queryDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "200Mi", "400Mi")
+	queryDepl.ContainerResources = kghelpers.NewResourcesRequirements("100m", "", "100Mi", "200Mi")
 	queryDepl.Name = serviceName
 
 	if cfg.Image != "" {
